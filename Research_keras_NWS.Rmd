@@ -1,0 +1,422 @@
+---
+title: " Keras "
+author: "남원식"
+output: html_document
+---
+
+**Keras Package 내 Boston Housing Price 데이터셋과 함수를 이용하여 다중 회귀분석을 수행하시오**
+</br>
+</br>
+</br>
+**Bouston Housing Pirce 데이터 셋에 대한 설명**
+
+1. CRIM 자치시(town) 별 1인당 범죄율
+2. ZN 25,000 평방피트를 초과하는 거주지역의 비율
+3. INDUS 비소매상업지역이 점유하고 있는 토지의 비율
+4. CHAS 찰스강에 대한 더미변수(강의 경계에 위치한 경우는 1, 아니면 0) 
+5. NOX 10ppm 당 농축 일산화질소  
+6. RM 주택 1가구당 평균 방의 개수  
+7. AGE 1940년 이전에 건축된 소유주택의 비율 
+8. DIS 5개의 보스턴 직업센터까지의 접근성 지수  
+9. RAD 방사형 도로까지의 접근성 지수  
+10. TAX 10,000 달러 당 재산세율  
+11. 0PTRATIO 자치시(town)별 학생/교사 비율 
+12. BK 흑인의 비율
+13. LSTAT 모집단의 하위계층의 비율(%)  
+14. MEDV 본인 소유의 주택가격(중앙값) (단위: $1,000)
+
+</br>
+</br>
+**데이터 전처리 과정**</br>
+`- 데이터 로드 및 분할`
+<details open><summary>설명</summary>
+boston_housing 데이터셋을 로드한후 train set,test으로 분할한다.
+</details>
+```
+import keras
+(X_train, Y_train), (x_test, y_test) = boston_housing.load_data()
+```
+`- 데이터의 정규화`
+<details open><summary>설명</summary>
+데이터의 범위가 너무 광범위하기때문에 데이터를 정규화 해준다.
+</details>
+```
+X_mean = X_train.mean()
+X_std = X_train.std()
+X_train -= X_mean
+X_train /= X_std
+x_test -= X_mean
+x_test /= X_std
+
+Y_mean = Y_train.mean()
+Y_std = Y_train.std()
+Y_train -= Y_mean
+Y_train /= Y_std
+y_test -= Y_mean
+y_test /= Y_std
+print(X_train[0], Y_train[0], x_test[0], y_test[0])
+```
+**Keras를 이용하여 다중회귀모델 생성하기**
+
+`-순차모델 생성하기`
+<details open><summary>설명</summary>
+Keras패키지의 Sequential 메서드를 이용하여 모델을 생성해준다.
+</details>
+```
+model = keras.Sequential([
+    keras.layers.Dense(units=50, activation='relu', input_shape=(13,)),
+    keras.layers.Dense(units=30, activation='relu'),
+    keras.layers.Dense(units=20, activation='relu'),
+    keras.layers.Dense(units=1)])
+```
+`-모델 컴파일하기`
+<details open><summary>설명</summary>
+adam = 가중치와 절편을 추정하여 실제값과 유사한 값을 찾아준다.
+</details>
+```
+model.compile(optimizer=keras.optimizers.Adam(lr=0.07), loss='mse')
+model.summary()
+```
+`-모델 학습시키기`
+```
+m1_fit = model.fit(X_train, Y_train, epochs=25, batch_size=32, validation_split=0.25)
+```
+`-머신러닝 성능 평가하기`
+```
+model.evaluate(x_test, y_test)
+```
+`-예측한 값을 시각화하기`
+```
+plt.plot(m1_fit.history['loss'], 'b-', label='loss')
+plt.plot(m1_fit.history['val_loss'], 'r--', label='val_loss')
+plt.xlabel('Epoch')
+plt.legend()
+plt.show()
+```
+`-실제값과 예측값과 비교하기`
+```
+pred = model.predict(x_test)
+
+plt.figure(figsize=(5,5))
+plt.plot(y_test, pred, 'b.')
+plt.axis([min(y_test), max(y_test), min(y_test), max(y_test)])
+plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], ls="--", c=".3")
+plt.xlabel('test_Y')
+plt.ylabel('pred_Y')
+plt.show()
+```
+**keras package 내 Boston Housing Price 데이터셋 대상으로 기존의 R 함수를 이용하여 다중회귀분석을 실행하고 (1)번의 결과와 비교하시오**
+```{r}
+library(mlbench)
+library(car)
+data("BostonHousing")
+formula <- medv ~ crim + zn + indus + chas + nox + rm + age + dis + rad + 
+  tax + ptratio + b + lstat
+lm_boston <- lm(formula, data = BostonHousing)
+lm2_boston <- step(lm_boston, direction="both") 
+```
+<details open><summary>설명</summary>
+AIC는 아카이케 정보기준을 나타내며 품질을 나타낸다. AIC가 낮을수록 좋은 포뮬러이다.
+</details>
+`-최적의 포물러 찾기`
+```{r}
+formula2 <- medv ~ crim + zn + chas + nox + rm + dis + rad + tax + ptratio + 
+  b + lstat
+lm3_boston <- lm(formula2, data = BostonHousing)
+lm3_boston
+summary(lm3_boston)
+```
+<details open><summary>설명</summary>
+최적의 포뮬러를 찾은후 회귀분석 보기
+</details>
+`-트레이닝셋과 테스트셋 나누기`
+```{r}
+idx = sample(1:nrow(BostonHousing), 0.7*nrow(BostonHousing))
+idx             
+train <- BostonHousing[idx,]
+test <-  BostonHousing[-idx,]
+```
+`-학습하고 예측하기`
+```{r}
+set.seed(1234)
+fit.lm <- lm(formula, data = train)
+summary(fit.lm)
+pred.lm <- predict(fit.lm, test)
+cor(pred.lm,test$medv)
+```
+<details open><summary>설명</summary>
+예측 정확도는 83%로 높은 예측률이 나오는 것을 알수 있다.
+</details>
+</br>
+![사진](C:/Users/Nam/Desktop/figure5.png) 
+<details open><summary>설명</summary>
+반면에 Keras를 이용하여 성능 테스트를 한결과 72%의 예측정확도를 보였다. 
+R에서는 기존에 사용하던 완성된 머신러닝을 사용한결과 83%의 예측률을 보인것으로 판단이된다.
+Keras패키지를 이용할경우 파라미터의 조정이 필요하다.
+</details>
+</br>
+**‘Deep Learning with R’ 교재 내 5.2 Using convnets with small datasets 섹션에서 개와 고양이의 이미지 분류 문제에서 다음 조건을 고려하여 실행하시오.**</br>
+</br>
+`-데이터셋에 대한 설명`
+cats&dogs데이터 셋은 고양이와 강아지사진이 각 5000장씩 있는 데이터 셋이다.
+`-사용된 패키지`
+```
+import os
+import shutil
+from keras import layers
+from keras import models
+from keras import optimizers
+from keras.preprocessing.image import ImageDataGenerator
+import matplotlib.pyplot as plt
+```
+`-조건에 제시된 사진을 저장하기위한 디렉터리 만들기`
+```
+train_dir = os.path.join(base_dir, 'train')
+os.makedirs(train_dir,exist_ok = True)
+validation_dir = os.path.join(base_dir, 'validation')
+os.makedirs(validation_dir, exist_ok = True)
+test_dir = os.path.join(base_dir, 'test')
+os.makedirs(test_dir, exist_ok = True)
+# 훈련용 고양이 사진 디렉터리 만들기
+train_cats_dir = os.path.join(train_dir, 'cats')
+os.makedirs(train_cats_dir, exist_ok = True)
+# 훈련용 강아지 사진 디렉터리 만들기
+train_dogs_dir = os.path.join(train_dir, 'dogs')
+os.makedirs(train_dogs_dir, exist_ok= True)
+# 검증용 고양이 사진 디렉터리 만들기
+validation_cats_dir = os.path.join(validation_dir, 'cats')
+os.makedirs(validation_cats_dir, exist_ok = True)
+# 검증용 강아지 사진 디렉터리 만들기
+validation_dogs_dir = os.path.join(validation_dir, 'dogs')
+os.makedirs(validation_dogs_dir, exist_ok= True)
+# 테스트용 고양이 사진 디렉터리 만들기
+test_cats_dir = os.path.join(test_dir, 'cats')
+os.makedirs(test_cats_dir,exist_ok = True)
+# 테스트용 강아지 사진 디렉터리 만들기
+test_dogs_dir = os.path.join(test_dir, 'dogs')
+os.makedirs(test_dogs_dir, exist_ok = True)
+```
+`-조건에 따라 데이터셋 분류하기`
+```
+# 2000~3000번째 고양이 이미지를 train_cats_dir에 복사
+fnames = ['{}.jpg'.format(i) for i in range(2000,3000)]
+for fname in fnames:
+    src = os.path.join(original_dataset_dir_cats, fname)
+    dst = os.path.join(train_cats_dir, fname)
+    shutil.copyfile(src, dst)
+# 3000~ 3500번째 고양이 이미지를 validation_cats_dir에 복사
+fnames = ['{}.jpg'.format(i) for i in range(3000, 3500)]
+for fname in fnames:
+    src = os.path.join(original_dataset_dir_cats, fname)
+    dst = os.path.join(validation_cats_dir, fname)
+    shutil.copyfile(src, dst)
+
+# 3500~4000 번째 고양이 이미지를 test_cats_dir에 복사
+fnames = ['{}.jpg'.format(i) for i in range(3500, 4000)]
+for fname in fnames:
+    src = os.path.join(original_dataset_dir_cats, fname)
+    dst = os.path.join(test_cats_dir, fname)
+    shutil.copyfile(src, dst)
+# 4000~5000번째 강아지 이미지를 train_dogs_dir에 복사
+fnames = ['{}.jpg'.format(i) for i in range(4000,5000)]
+for fname in fnames:
+    src = os.path.join(original_dataset_dir_dogs, fname)
+    dst = os.path.join(train_dogs_dir, fname)
+    shutil.copyfile(src, dst)
+
+# 5000~5500번째 강아지 이미지를 validation_dogs_dir에 복사
+fnames = ['{}.jpg'.format(i) for i in range(5000, 5500)]
+for fname in fnames:
+    src = os.path.join(original_dataset_dir_dogs, fname)
+    dst = os.path.join(validation_dogs_dir, fname)
+    shutil.copyfile(src, dst)
+
+# 5500~6000번째 강아지 이미지를 test_dogs_dir에 복사
+fnames = ['{}.jpg'.format(i) for i in range(5500, 6000)]
+for fname in fnames:
+    src = os.path.join(original_dataset_dir_dogs, fname)
+    dst = os.path.join(test_dogs_dir, fname)
+    shutil.copyfile(src, dst)
+```
+`-네트워크 생성하기`
+```
+model = models.Sequential()
+model.add(layers.Conv2D(32, (3, 3), activation='relu',input_shape=(150, 150, 3)))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(64, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(128, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Conv2D(128, (3, 3), activation='relu'))
+model.add(layers.MaxPooling2D((2, 2)))
+model.add(layers.Flatten())
+model.add(layers.Dense(512, activation='relu'))
+model.add(layers.Dense(1, activation='sigmoid'))
+model.summary()
+```
+<details open><summary>설명</summary>
+처음 사이즈는 150*150으로 생성 깊이는 깊어지고 사이즈는 7*7까지 줄어든것을 볼수있다.
+</details>
+`-컴파일 하기`
+```
+model.compile(loss='binary_crossentropy',
+              optimizer=optimizers.RMSprop(lr=1e-4),
+              metrics=['acc'])
+```
+<details open><summary>설명</summary>
+네트워크의 마지막단계가 시그모이드 이기때문에 이진 크로스엔트로피를 손실로 사용함.
+</details>
+`-케라스 패키지를 이용하여 이미지 전처리하기`
+```
+train_data = ImageDataGenerator(rescale=1./255)
+test_data = ImageDataGenerator(rescale=1./255)
+```
+`-데이터 전처리 하기`
+```
+# 트레이닝셋 데이터 전처리
+train_generator = train_data.flow_from_directory(
+        train_dir,
+        target_size=(150, 150),
+        batch_size=20,
+        class_mode='binary')
+# 150 * 150 사이즈로, 손실법을 이진으로 하기때문에 이진분류가필요함.
+# 검증셋 이미지 전처리
+validation_generator = test_data.flow_from_directory(
+        validation_dir,
+        target_size=(150, 150),
+        batch_size=20,
+        class_mode='binary')
+```
+`-트레이닝`
+```
+model_f = model.fit_generator(
+        train_generator,
+        steps_per_epoch=100,
+        epochs=30,
+        validation_data=validation_generator,
+        validation_steps=50)
+```
+<details open><summary>설명</summary>
+에포크당 100번 30번 반복하는 네트워크이다
+</details>
+`-훈련데이터, 검증데이터의 손실도와 정확도를 그래프로 시각화`
+```
+acc = model_f.history['acc']
+val_acc = model_f.history['val_acc']
+loss = model_f.history['loss']
+val_loss = model_f.history['val_loss']
+
+epochs = range(len(acc))
+
+plt.plot(epochs, acc, 'bo', label='Training acc')
+plt.plot(epochs, val_acc, 'b', label='Validation acc')
+plt.title('Training and validation accuracy')
+plt.legend()
+
+plt.figure()
+plt.plot(epochs, loss, 'bo', label='Training loss')
+plt.plot(epochs, val_loss, 'b', label='Validation loss')
+plt.title('Training and validation loss')
+plt.legend()
+plt.show()
+```
+![사진](C:/Users/Nam/Desktop/figure1.png) 
+![사진](C:/Users/Nam/Desktop/figure2.png)
+<details open><summary>설명</summary>
+데이터의 샘플수가 2000개 밖에 되지않아 오버피팅 현상이 일어나는 것을 볼수 있다.
+데이터의 양을 늘려야 한다는 판단을 함
+</details>
+</br>
+
+**2) 정확성을 높이기 위한 방법과 사용자가 조정할수 있는 파라미터는 무엇인지 기술하시오.**</br>
+`-데이터를 증식시켜 샘플을 수를 늘리기`
+```
+datagen = ImageDataGenerator(
+      rotation_range=40,
+      width_shift_range=0.2,
+      height_shift_range=0.2,
+      shear_range=0.2,
+      zoom_range=0.2,
+      horizontal_flip=True,
+      fill_mode='nearest')
+i = 0
+for batch in datagen.flow(x, batch_size=1):
+    plt.figure(i)
+    imgplot = plt.imshow(image.array_to_img(batch[0]))
+    i += 1
+    if i % 4 == 0:
+        break
+
+plt.show()
+train_datagen = ImageDataGenerator(
+    rescale=1./255,
+    rotation_range=40,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,)
+
+test_datagen = ImageDataGenerator(rescale=1./255)
+
+train_generator = train_data.flow_from_directory(
+        train_dir,
+        target_size=(150, 150),
+        batch_size=32,
+        class_mode='binary')
+
+validation_generator = test_datagen.flow_from_directory(
+        validation_dir,
+        target_size=(150, 150),
+        batch_size=32,
+        class_mode='binary')
+
+```
+<details open><summary>설명</summary>
+rotation_range = 사진을 회전시킴</br>
+width_shift_range와 height_shift_range는 사진을 수평과 수직으로 랜덤하게 평행 이동시킬 범위의 비율</br>
+share range = 랜덤하게 전단 변환을 할 각도</br>
+zoom range = 랜덤하게 화면을 확대할 범위</br>
+horizen_flip = 랜덤하게 이미지를 수평으로 뒤집음</br>
+fill mode = 회전이나, 가로세로 이동으로인해 픽셀을 채워야하는경우</br>
+</details>
+`-증식된 데이터를 활용하여 다시 트레이닝`
+```
+model_f2 = model.fit_generator(
+      train_generator,
+      steps_per_epoch=100,
+      epochs=100,
+      validation_data=validation_generator,
+      validation_steps=50)
+```
+<details open><summary>설명</summary>
+반복횟수를 늘려 트레이닝의 성능을 향상시킬수 있음
+</details>
+`-성능이 향상됬는지 확인을 위해 시각화`
+```
+acc = model_f2.history['acc']
+val_acc = model_f2.history['val_acc']
+loss = model_f2.history['loss']
+val_loss = model_f2.history['val_loss']
+
+epochs = range(len(acc))
+
+plt.plot(epochs, acc, 'bo', label='Training acc')
+plt.plot(epochs, val_acc, 'b', label='Validation acc')
+plt.title('Training and validation accuracy')
+plt.legend()
+
+plt.figure()
+
+plt.plot(epochs, loss, 'bo', label='Training loss')
+plt.plot(epochs, val_loss, 'b', label='Validation loss')
+plt.title('Training and validation loss')
+plt.legend()
+
+plt.show()
+```
+![사진](C:/Users/Nam/Desktop/figure3.png)
+![사진](C:/Users/Nam/Desktop/figure4.png) 
+<details open><summary>설명</summary>
+샘플의 양을 늘리고 에포크를 더많이 반복 한결과 검증데이터의 정확도가 82퍼센트까지 증가한것을 볼수 있다.
+</details>
